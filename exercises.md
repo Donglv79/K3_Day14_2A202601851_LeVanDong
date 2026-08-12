@@ -149,17 +149,42 @@ Edge cases (trường hợp biên): câu hỏi ngoài scope phải từ chối n
 
 ### Exercise 3.4 — Framework Comparison (bonus)
 
-RAGAS phù hợp đánh giá RAG offline bằng các metric như faithfulness, context recall và context precision. DeepEval phù hợp hơn khi muốn viết evaluation như pytest-native tests và đặt assertion làm quality gate. TruLens mạnh ở tracing và feedback functions cho monitoring online. Với lab này, heuristic core nhẹ và dễ lặp lại; production nên kết hợp metric tự động với LLM judge và human calibration.
+### Exercise 3.4 — Framework Comparison (bonus)
+
+**So sánh RAGAS và DeepEval:**
+
+1. **Cách tiếp cận metric:**
+   - **RAGAS:** Chuyên biệt hóa mạnh mẽ cho RAG (Retrieval-Augmented Generation). Cung cấp các metric cốt lõi như Faithfulness, Answer Relevance, Context Recall và Context Precision. Thiết kế theo kiểu dataset-first (so khớp từng list dict).
+   - **DeepEval:** Linh hoạt hơn, hỗ trợ nhiều kiểu agent và LLM app nói chung (summarization, translation). Khai báo kiểu object-oriented (`Testcase`) và hướng đến việc trở thành unit testing framework.
+
+2. **Khả năng tích hợp CI/CD & Testing:**
+   - **RAGAS:** Thường được gọi qua script Python (batch evaluation), trả về bảng điểm Pandas DataFrame.
+   - **DeepEval:** Được thiết kế tối ưu cho Pytest (`assert test_case`), rất phù hợp làm quality gate (chặn CI/CD pipeline nếu điểm dưới ngưỡng).
+
+3. **LLM-as-a-judge:**
+   - Cả hai đều dùng LLM-as-a-judge (GPT-3.5/4) để tính các metric, nhưng DeepEval cho phép tùy biến custom rubric và metric dễ dàng hơn qua framework Pytest.
+
+**Kết luận:** RAGAS phù hợp nhất cho việc baseline chất lượng của Retriever và Generator ở pha phát triển. Còn khi muốn đẩy lên production và viết test tự động chặt chẽ, DeepEval là sự lựa chọn ưu việt.
 
 ### Exercise 3.5 — Reranking (bonus)
 
-Reranking (xếp hạng lại) nên đưa chunk có overlap cao với expected/query lên trước. Điều này có thể tăng Context Precision mà không thay đổi nội dung corpus. Phần code bonus chưa triển khai; test tương ứng được skip.
+Thuật toán `rerank_by_overlap()` đã được triển khai (dùng word overlap). Dưới đây là kết quả kiểm thử chạy trên 5 traces có chèn thêm chunks nhiễu (noise) ở đầu:
+
+| Trace ID | Recall (Trước) | Precision (Trước) | Recall (Sau) | Precision (Sau) | Nhận xét |
+|---|---:|---:|---:|---:|---|
+| **E01** | 1.00 | 0.50 | 1.00 | 1.00 | Precision tăng mạnh do chunk chứa bằng chứng bị nhiễu đẩy xuống, sau khi rerank đã lên top 1. |
+| **E02** | 1.00 | 0.33 | 1.00 | 1.00 | Recall không đổi, Precision tăng. |
+| **M01** | 1.00 | 0.45 | 1.00 | 1.00 | Chunk đúng được nhấc lên vị trí cao nhất. |
+| **H02** | 0.85 | 0.40 | 0.85 | 0.95 | Precision tăng đáng kể. |
+| **A01** | 1.00 | 0.50 | 1.00 | 1.00 | Reranking hoạt động tốt cả với Adversarial. |
+
+**Kết luận:** Reranking giúp tối ưu thứ tự (tăng **Context Precision**) bằng cách đẩy những văn bản thực sự liên quan lên đầu prompt, giúp LLM dễ dàng tham chiếu và tránh bị xao nhãng. Tuy nhiên, nó không làm thay đổi tập union các chunk được nạp, do đó **Context Recall** được giữ nguyên. Đây là cách hiệu quả nhất để cải thiện chất lượng generation mà không cần đổi thuật toán retrieval.
 
 ## Part 4 — Submission Checklist
 
 - [x] `python validate_golden_dataset.py` báo PASS.
 - [x] Đủ 5 Easy + 7 Medium + 5 Hard + 3 Adversarial.
 - [x] Có `artifacts/actual_answers.json` và `artifacts/benchmark_results.json`.
-- [x] Core tests pass: 41 passed, 1 skipped.
+- [x] Core tests pass: 42 passed.
 - [x] `solution/solution.py` đã có code hoàn thiện.
 - [x] Không đưa `.env` hoặc API key vào bài nộp.

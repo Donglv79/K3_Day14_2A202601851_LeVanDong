@@ -361,12 +361,8 @@ def rerank_by_overlap(contexts: list[str], query: str) -> list[str]:
 
     Reordering relevant chunks toward the top increases the rank-aware
     Context Precision WITHOUT changing the retrieved set.
-
-    Hint: sorted(contexts, key=lambda c: len(_tokenize(c) & _tokenize(query)),
-                 reverse=True)
     """
-    # TODO (Bonus — Exercise 3.5): implement the reranker
-    raise NotImplementedError("Implement rerank_by_overlap")
+    return sorted(contexts, key=lambda c: len(_tokenize(c) & _tokenize(query)), reverse=True)
 
 
 # ---------------------------------------------------------------------------
