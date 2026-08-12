@@ -1,5 +1,44 @@
 # Ngày 14 — AI Evaluation & Benchmarking Pipeline
 
+## Ghi chú: chuyển từ OpenAI sang Gemini
+
+`domain_assistant.py` hỗ trợ chạy bằng Gemini thông qua endpoint tương thích
+OpenAI. Để dùng Gemini thay cho OpenAI, tạo hoặc cập nhật file `.env` như sau:
+
+```env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+Không ghi API key thật vào `README.md`, không commit `.env` và không gửi API key
+lên GitHub. Nếu key đã bị lộ, hãy thu hồi key cũ và tạo key mới.
+
+Sau khi cấu hình, chạy:
+
+```powershell
+python validate_golden_dataset.py
+python domain_assistant.py
+python evaluate_answers.py
+```
+
+Hai artifact được tạo là:
+
+```text
+artifacts/actual_answers.json
+artifacts/benchmark_results.json
+```
+
+Nếu Gemini báo lỗi `429 RESOURCE_EXHAUSTED`, nghĩa là đã vượt quota hoặc giới
+hạn request/phút. Chờ quota reset, dùng model được API key hỗ trợ hoặc kiểm tra
+billing/quota của Google AI Studio. Nếu muốn quay lại OpenAI, đổi `.env` thành:
+
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+```
+
 **AICB-P1 · Phase 1 · Ngày 14 trong 15 · K3**
 
 Lab này là bài **AI Evaluation**. Bạn sẽ hoàn thiện evaluation core trong
