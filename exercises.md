@@ -147,38 +147,75 @@ Chấm mỗi tiêu chí từ 1 đến 5:
 
 Edge cases (trường hợp biên): câu hỏi ngoài scope phải từ chối ngắn gọn; prompt injection không được làm lộ prompt/credentials; policy có ngày hiệu lực phải dùng đúng event date; nếu evidence thiếu phải nói không đủ thông tin thay vì đoán.
 
-### Exercise 3.4 — Framework Comparison (bonus)
 
 ### Exercise 3.4 — Framework Comparison (bonus)
 
-**So sánh RAGAS và DeepEval:**
+**Mục tiêu và thiết kế công bằng:** Tôi chạy RAGAS `0.4.3` và DeepEval
+`4.1.3` trên đúng cùng 20 cặp `actual_answer`/`expected_answer` của
+`artifacts/actual_answers.json` và `golden_dataset.json`. Cả hai dùng metric
+native **Exact Match (khớp chính xác)**: đúng hoàn toàn được 1, khác dù chỉ một
+ký tự được 0. Metric này không gọi LLM, không dùng API key và có thể tái lập
+hoàn toàn. Lệnh chạy:
 
-1. **Cách tiếp cận metric:**
-   - **RAGAS:** Chuyên biệt hóa mạnh mẽ cho RAG (Retrieval-Augmented Generation). Cung cấp các metric cốt lõi như Faithfulness, Answer Relevance, Context Recall và Context Precision. Thiết kế theo kiểu dataset-first (so khớp từng list dict).
-   - **DeepEval:** Linh hoạt hơn, hỗ trợ nhiều kiểu agent và LLM app nói chung (summarization, translation). Khai báo kiểu object-oriented (`Testcase`) và hướng đến việc trở thành unit testing framework.
+```powershell
+python eval_frameworks.py
+```
 
-2. **Khả năng tích hợp CI/CD & Testing:**
-   - **RAGAS:** Thường được gọi qua script Python (batch evaluation), trả về bảng điểm Pandas DataFrame.
-   - **DeepEval:** Được thiết kế tối ưu cho Pytest (`assert test_case`), rất phù hợp làm quality gate (chặn CI/CD pipeline nếu điểm dưới ngưỡng).
+**Luồng input → xử lý → output:** cùng câu hỏi, câu trả lời thực tế và câu trả
+lời chuẩn được chuyển thành `RAGAS ExactMatch.score(response, reference)` và
+DeepEval `LLMTestCase` + `ExactMatchMetric.measure()`. Script xuất điểm từng
+trace, tỷ lệ trung bình và số trace hai framework bất đồng.
 
-3. **LLM-as-a-judge:**
-   - Cả hai đều dùng LLM-as-a-judge (GPT-3.5/4) để tính các metric, nhưng DeepEval cho phép tùy biến custom rubric và metric dễ dàng hơn qua framework Pytest.
+| Framework | Cách biểu diễn cùng input | Kết quả Exact Match | Bất đồng |
+|---|---|---:|---:|
+| RAGAS 0.4.3 | Gọi metric theo `response` và `reference` | 1/20 = **5.00%** | 0 |
+| DeepEval 4.1.3 | `LLMTestCase(input, actual_output, expected_output)` | 1/20 = **5.00%** | 0 |
 
-**Kết luận:** RAGAS phù hợp nhất cho việc baseline chất lượng của Retriever và Generator ở pha phát triển. Còn khi muốn đẩy lên production và viết test tự động chặt chẽ, DeepEval là sự lựa chọn ưu việt.
+Chỉ trace **E02** khớp nguyên văn; 19 trace còn lại có thể đúng ý nhưng khác
+cách diễn đạt. Hai framework cho kết quả giống nhau vì đang dùng cùng định
+nghĩa Exact Match. Kết quả 5% không có nghĩa hệ thống chỉ đúng 5%; nó chứng minh
+Exact Match quá nghiêm khắc cho câu trả lời RAG dạng tự do.
+
+**So sánh cách sử dụng:** RAGAS thiên về evaluation theo dataset và có các
+metric RAG như Faithfulness, Response Relevancy, Context Recall và Context
+Precision. DeepEval đóng gói mỗi tương tác thành test case, có threshold và
+phù hợp hơn với unit test/quality gate trong CI/CD. Các metric ngữ nghĩa của cả
+hai thường cần LLM-as-a-judge; tôi không báo cáo chúng ở đây vì lần chạy này
+cố ý offline, deterministic và không tiêu thụ quota.
+
+**Kết luận:** với phân tích batch và chẩn đoán retriever/generator, RAGAS thuận
+tiện hơn; với regression test (kiểm thử hồi quy) và CI/CD, DeepEval thuận tiện
+hơn. Khi đánh giá câu trả lời mở, nên bổ sung Faithfulness/Relevancy hoặc human
+review thay vì dùng riêng Exact Match.
 
 ### Exercise 3.5 — Reranking (bonus)
 
-Thuật toán `rerank_by_overlap()` đã được triển khai (dùng word overlap). Dưới đây là kết quả kiểm thử chạy trên 5 traces có chèn thêm chunks nhiễu (noise) ở đầu:
+`rerank_by_overlap()` sắp xếp giảm dần theo số token chung giữa query và chunk.
+Phép đo dùng trực tiếp 5 retrieval traces đã lưu trong
+`artifacts/actual_answers.json`, không chèn chunk giả. Trước và sau đều dùng
+đúng cùng các chunk; `Counter(before) == Counter(after)` kiểm tra cả nội dung,
+số lượng và duplicate. Lệnh tái lập:
 
-| Trace ID | Recall (Trước) | Precision (Trước) | Recall (Sau) | Precision (Sau) | Nhận xét |
-|---|---:|---:|---:|---:|---|
-| **E01** | 1.00 | 0.50 | 1.00 | 1.00 | Precision tăng mạnh do chunk chứa bằng chứng bị nhiễu đẩy xuống, sau khi rerank đã lên top 1. |
-| **E02** | 1.00 | 0.33 | 1.00 | 1.00 | Recall không đổi, Precision tăng. |
-| **M01** | 1.00 | 0.45 | 1.00 | 1.00 | Chunk đúng được nhấc lên vị trí cao nhất. |
-| **H02** | 0.85 | 0.40 | 0.85 | 0.95 | Precision tăng đáng kể. |
-| **A01** | 1.00 | 0.50 | 1.00 | 1.00 | Reranking hoạt động tốt cả với Adversarial. |
+```powershell
+python eval_rerank.py
+```
 
-**Kết luận:** Reranking giúp tối ưu thứ tự (tăng **Context Precision**) bằng cách đẩy những văn bản thực sự liên quan lên đầu prompt, giúp LLM dễ dàng tham chiếu và tránh bị xao nhãng. Tuy nhiên, nó không làm thay đổi tập union các chunk được nạp, do đó **Context Recall** được giữ nguyên. Đây là cách hiệu quả nhất để cải thiện chất lượng generation mà không cần đổi thuật toán retrieval.
+| Trace | Recall trước | Precision trước | Recall sau | Precision sau | Cùng tập chunks |
+|---|---:|---:|---:|---:|:---:|
+| E01 | 1.0000 | 0.8042 | 1.0000 | 0.9500 | Có |
+| E03 | 1.0000 | 0.9167 | 1.0000 | 1.0000 | Có |
+| E04 | 0.6667 | 0.8042 | 0.6667 | 0.8875 | Có |
+| M01 | 1.0000 | 0.9500 | 1.0000 | 0.8875 | Có |
+| A01 | 0.9444 | 0.8875 | 0.9444 | 1.0000 | Có |
+| **Trung bình** | **0.9222** | **0.8725** | **0.9222** | **0.9450** | **Có** |
+
+**Kết luận:** Context Recall (độ phủ ngữ cảnh) giữ nguyên tuyệt đối vì metric
+dùng union token và reranker không thêm hoặc xóa chunk. Context Precision (độ
+chính xác theo thứ hạng) trung bình tăng `+0.0725`, chứng minh thay đổi đến từ
+ranking. M01 giảm `0.0625`, cho thấy word overlap là heuristic từ vựng và không
+bảo đảm cải thiện mọi query; một cross-encoder reranker có thể xử lý quan hệ
+ngữ nghĩa tốt hơn. Vì vậy kết quả trung bình tốt lên nhưng cần theo dõi từng
+trace, không chỉ báo cáo aggregate.
 
 ## Part 4 — Submission Checklist
 
